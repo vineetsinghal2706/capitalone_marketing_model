@@ -144,18 +144,7 @@ jobs:
           echo "AWS_REGION: $AWS_REGION"
 
           echo ""
-          echo "GitHub configuration validation successful."
-
-
-      # ======================================================
-      # DEBUG OIDC
-      # MUST COME BEFORE AWS CREDENTIAL CONFIGURATION
-      # ======================================================
-
-      - name: OIDC Debug
-        uses: github/actions-oidc-debugger@main
-        with:
-          audience: sts.amazonaws.com
+          echo "GitHub configuration validation successful.
 
 
       # ======================================================
