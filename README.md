@@ -1,6 +1,6 @@
 # Bank Marketing MLOps POC
 
-dCurrent scope:
+Current scope:
 
 Snowflake -> Glue Job 1 -> S3 Raw -> Glue Job 2 -> S3 Processed
 
