@@ -12,6 +12,7 @@ on:
 
 # Default permissions
 permissions:
+  id-token: write
   contents: read
 
 
