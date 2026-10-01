@@ -12,7 +12,6 @@ on:
 
 # Default permissions
 permissions:
-  id-token: write
   contents: read
 
 
@@ -87,9 +86,9 @@ jobs:
       - validate
       - validate-dag
 
-    # Deploy only for actual pushes
     if: github.event_name == 'push'
 
+    # OIDC permission ONLY for the deployment job
     permissions:
       id-token: write
       contents: read
@@ -116,51 +115,27 @@ jobs:
         env:
           AWS_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           CODE_BUCKET: ${{ vars.GLUE_CODE_BUCKET }}
+
         run: |
 
           echo "=============================================="
           echo "Checking GitHub Actions configuration"
           echo "=============================================="
 
-          # Check AWS Role ARN
           if [ -z "$AWS_ROLE_ARN" ]; then
             echo "ERROR: AWS_DEPLOY_ROLE_ARN is NOT configured."
-            echo ""
-            echo "Go to:"
-            echo "GitHub Repository"
-            echo "  -> Settings"
-            echo "  -> Secrets and variables"
-            echo "  -> Actions"
-            echo "  -> Variables"
-            echo ""
-            echo "Create repository variable:"
-            echo "AWS_DEPLOY_ROLE_ARN"
             exit 1
           fi
 
           echo "AWS_DEPLOY_ROLE_ARN: configured"
 
-
-          # Check S3 bucket
           if [ -z "$CODE_BUCKET" ]; then
             echo "ERROR: GLUE_CODE_BUCKET is NOT configured."
-            echo ""
-            echo "Go to:"
-            echo "GitHub Repository"
-            echo "  -> Settings"
-            echo "  -> Secrets and variables"
-            echo "  -> Actions"
-            echo "  -> Variables"
-            echo ""
-            echo "Create repository variable:"
-            echo "GLUE_CODE_BUCKET"
             exit 1
           fi
 
           echo "GLUE_CODE_BUCKET: configured"
 
-
-          # Check AWS region
           if [ -z "$AWS_REGION" ]; then
             echo "ERROR: AWS_REGION is empty."
             exit 1
@@ -173,6 +148,17 @@ jobs:
 
 
       # ======================================================
+      # DEBUG OIDC
+      # MUST COME BEFORE AWS CREDENTIAL CONFIGURATION
+      # ======================================================
+
+      - name: OIDC Debug
+        uses: github/actions-oidc-debugger@main
+        with:
+          audience: sts.amazonaws.com
+
+
+      # ======================================================
       # Configure AWS credentials using GitHub OIDC
       # ======================================================
 
@@ -181,16 +167,13 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
 
 
       # ======================================================
       # Check AWS credentials
       # ======================================================
-      - name: OIDC Debug
-        uses: github/actions-oidc-debugger@main
-        with:
-          audience: sts.amazonaws.com
-        
+
       - name: Check AWS identity
         run: |
 
