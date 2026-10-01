@@ -186,7 +186,11 @@ jobs:
       # ======================================================
       # Check AWS credentials
       # ======================================================
-
+      - name: OIDC Debug
+        uses: github/actions-oidc-debugger@main
+        with:
+          audience: sts.amazonaws.com
+        
       - name: Check AWS identity
         run: |
 
