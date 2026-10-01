@@ -10,8 +10,10 @@ on:
     branches:
       - main
 
+# Default permissions
 permissions:
   contents: read
+
 
 jobs:
 
@@ -35,7 +37,9 @@ jobs:
 
       - name: Compile Python files
         run: |
+          echo "Checking Python syntax..."
           python -m compileall -q glue airflow
+          echo "Python syntax validation successful."
 
 
   # ==========================================================
@@ -65,7 +69,9 @@ jobs:
 
       - name: Compile DAG
         run: |
+          echo "Checking Airflow DAG syntax..."
           python -m py_compile airflow/dags/snowflake_to_s3_glue.py
+          echo "Airflow DAG validation successful."
 
 
   # ==========================================================
@@ -80,8 +86,7 @@ jobs:
       - validate
       - validate-dag
 
-    # Deploy only for actual pushes.
-    # Pull requests only validate the code.
+    # Deploy only for actual pushes
     if: github.event_name == 'push'
 
     permissions:
@@ -94,8 +99,81 @@ jobs:
 
     steps:
 
+      # ======================================================
+      # Checkout
+      # ======================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
+
+
+      # ======================================================
+      # Check GitHub configuration
+      # ======================================================
+
+      - name: Check GitHub configuration
+        env:
+          AWS_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          CODE_BUCKET: ${{ vars.GLUE_CODE_BUCKET }}
+        run: |
+
+          echo "=============================================="
+          echo "Checking GitHub Actions configuration"
+          echo "=============================================="
+
+          # Check AWS Role ARN
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "ERROR: AWS_DEPLOY_ROLE_ARN is NOT configured."
+            echo ""
+            echo "Go to:"
+            echo "GitHub Repository"
+            echo "  -> Settings"
+            echo "  -> Secrets and variables"
+            echo "  -> Actions"
+            echo "  -> Variables"
+            echo ""
+            echo "Create repository variable:"
+            echo "AWS_DEPLOY_ROLE_ARN"
+            exit 1
+          fi
+
+          echo "AWS_DEPLOY_ROLE_ARN: configured"
+
+
+          # Check S3 bucket
+          if [ -z "$CODE_BUCKET" ]; then
+            echo "ERROR: GLUE_CODE_BUCKET is NOT configured."
+            echo ""
+            echo "Go to:"
+            echo "GitHub Repository"
+            echo "  -> Settings"
+            echo "  -> Secrets and variables"
+            echo "  -> Actions"
+            echo "  -> Variables"
+            echo ""
+            echo "Create repository variable:"
+            echo "GLUE_CODE_BUCKET"
+            exit 1
+          fi
+
+          echo "GLUE_CODE_BUCKET: configured"
+
+
+          # Check AWS region
+          if [ -z "$AWS_REGION" ]; then
+            echo "ERROR: AWS_REGION is empty."
+            exit 1
+          fi
+
+          echo "AWS_REGION: $AWS_REGION"
+
+          echo ""
+          echo "GitHub configuration validation successful."
+
+
+      # ======================================================
+      # Configure AWS credentials using GitHub OIDC
+      # ======================================================
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -103,31 +181,117 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+
+      # ======================================================
+      # Check AWS credentials
+      # ======================================================
+
       - name: Check AWS identity
         run: |
+
+          echo "=============================================="
+          echo "Checking AWS credentials"
+          echo "=============================================="
+
           aws sts get-caller-identity
 
-      # ------------------------------------------------------
+          echo ""
+          echo "AWS authentication successful."
+
+
+      # ======================================================
+      # Check S3 bucket
+      # ======================================================
+
+      - name: Check Glue code bucket
+        run: |
+
+          echo "=============================================="
+          echo "Checking Glue code S3 bucket"
+          echo "=============================================="
+
+          echo "Bucket:"
+          echo "$GLUE_CODE_BUCKET"
+
+          aws s3 ls "s3://${GLUE_CODE_BUCKET}"
+
+          echo ""
+          echo "S3 bucket access successful."
+
+
+      # ======================================================
       # Deploy Glue Job 1
-      # ------------------------------------------------------
+      # ======================================================
 
       - name: Upload Glue Job 1
         run: |
+
+          echo "=============================================="
+          echo "Deploying Glue Job 1"
+          echo "=============================================="
+
           aws s3 cp \
             glue/snowflake_to_s3/snowflake_to_s3.py \
             "s3://${GLUE_CODE_BUCKET}/glue/snowflake_to_s3/snowflake_to_s3.py"
 
-      # ------------------------------------------------------
+          echo "Glue Job 1 uploaded successfully."
+
+
+      # ======================================================
       # Deploy Glue Job 2
-      # ------------------------------------------------------
+      # ======================================================
 
       - name: Upload Glue Job 2
         run: |
+
+          echo "=============================================="
+          echo "Deploying Glue Job 2"
+          echo "=============================================="
+
           aws s3 cp \
             glue/preprocessing/marketing-model-preprocessing.py \
             "s3://${GLUE_CODE_BUCKET}/glue/preprocessing/marketing-model-preprocessing.py"
 
+          echo "Glue Job 2 uploaded successfully."
+
+
+      # ======================================================
+      # Verify uploaded files
+      # ======================================================
+
+      - name: Verify Glue scripts
+        run: |
+
+          echo "=============================================="
+          echo "Verifying deployed Glue scripts"
+          echo "=============================================="
+
+          echo ""
+          echo "Glue Job 1:"
+          aws s3 ls \
+            "s3://${GLUE_CODE_BUCKET}/glue/snowflake_to_s3/"
+
+          echo ""
+          echo "Glue Job 2:"
+          aws s3 ls \
+            "s3://${GLUE_CODE_BUCKET}/glue/preprocessing/"
+
+          echo ""
+          echo "Glue scripts verified successfully."
+
+
+      # ======================================================
+      # Deployment completed
+      # ======================================================
+
       - name: Deployment completed
         run: |
-          echo "Glue Job 1 deployed successfully"
-          echo "Glue Job 2 deployed successfully"
+
+          echo "=============================================="
+          echo "DEPLOYMENT SUCCESSFUL"
+          echo "=============================================="
+
+          echo "Glue Job 1: Deployed"
+          echo "Glue Job 2: Deployed"
+          echo "S3 bucket: ${GLUE_CODE_BUCKET}"
+          echo "AWS region: ${AWS_REGION}"
