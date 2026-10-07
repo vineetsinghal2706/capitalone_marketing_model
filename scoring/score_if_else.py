@@ -9,6 +9,7 @@ BASE_SCORE = 0.4452
 BASE_MARGIN = math.log(BASE_SCORE / (1.0 - BASE_SCORE))
 
 
+
 def tree_001(x):
     if not pd.isna(x['credit_score']) and x['credit_score'] < 747.0:
         if not pd.isna(x['credit_risk_flag']) and x['credit_risk_flag'] < 1.0:
